@@ -1,4 +1,4 @@
-name: Build-1
+name: Build
 on:
   push:
     branches: [naive]
@@ -12,20 +12,14 @@ jobs:
   build_caddy_with_naive:
     runs-on: ubuntu-22.04
     env:
-      BUNDLE: caddy-forwardproxy-naive-arm64
+      BUNDLE: caddy-forwardproxy-naive
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ^1.21.9
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
-      - name: Build Caddy for ARM64
-        run: |
-          GOARCH=arm64 CGO_ENABLED=0 ~/go/bin/xcaddy build --with github.com/caddyserver/forwardproxy@master=$PWD
+      - run: ~/go/bin/xcaddy build --with github.com/caddyserver/forwardproxy@master=$PWD
       - name: Pack naiveproxy assets
         run: |
           mkdir ${{ env.BUNDLE }}
@@ -39,7 +33,7 @@ jobs:
           path: sha256sum.txt
       - name: Generate release tag
         if: github.event_name == 'push'
-        run: echo "RELEASE_TAG=build-arm64-$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
+        run: echo "RELEASE_TAG=build-$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
