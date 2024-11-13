@@ -1,4 +1,4 @@
-name: Build
+name: Build-bringssl
 on:
   push:
     branches: [naive]
@@ -42,6 +42,7 @@ jobs:
       # 克隆和编译支持 PQC 的 BoringSSL
       - name: Build BoringSSL
         run: |
+          rm -rf boringssl
           git clone https://github.com/open-quantum-safe/boringssl.git
           cd boringssl
           git checkout $BORINGSSL_BRANCH
