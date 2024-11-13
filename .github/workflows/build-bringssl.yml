@@ -1,46 +1,58 @@
-name: Build BoringSSL with liboqs
+name: Build BoringSSL with Naive Support
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: [naive]
+    paths-ignore: [README.md]
+  release:
+    types: [created]
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build_caddy_with_naive:
+    runs-on: ubuntu-22.04
     env:
       BUNDLE: caddy-forwardproxy-naive
       BORINGSSL_BRANCH: master
-      BORINGSSL_DIR: /home/runner/work/forwardproxy/forwardproxy/boringssl
-      LIBOQS_DIR: /home/runner/work/forwardproxy/forwardproxy/liboqs
+      BORINGSSL_DIR: ${{ github.workspace }}/boringssl
+      LIBOQS_DIR: ${{ github.workspace }}/liboqs
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      # 检出代码库
+      - uses: actions/checkout@v4
+      
+      # 设置Go环境
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ^1.21.9
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libunwind-dev cmake ninja-build
+      # 安装编译依赖
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc ninja-build libunwind-dev pkg-config python3 golang-cfssl
 
-    - name: Clone and build liboqs
-      run: |
-        git clone --branch main https://github.com/open-quantum-safe/liboqs.git $LIBOQS_DIR
-        cd $LIBOQS_DIR
-        mkdir build && cd build
-        cmake -GNinja -DCMAKE_INSTALL_PREFIX=/usr/local ..
-        ninja
-        sudo ninja install
+      # 安装 liboqs
+      - name: Install liboqs
+        run: |
+          rm -rf liboqs
+          git clone --branch main --single-branch --depth 1 https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs
+          mkdir build && cd build
+          cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=/usr/local ..
+          ninja
+          sudo ninja install
 
-    - name: Clone and build BoringSSL
-      run: |
-        rm -rf boringssl
-        git clone https://github.com/open-quantum-safe/boringssl.git
-        cd boringssl
-        git checkout $BORINGSSL_BRANCH
-        mkdir build && cd build
-        cmake -GNinja -DCMAKE_PREFIX_PATH=/usr/local ..
-        ninja
+      # 构建 BoringSSL
+      - name: Build BoringSSL with Naive Support
+        run: |
+          rm -rf boringssl
+          git clone https://github.com/open-quantum-safe/boringssl.git
+          cd boringssl
+          git checkout $BORINGSSL_BRANCH
+          mkdir build && cd build
+          cmake -GNinja -DCMAKE_PREFIX_PATH=/usr/local ..
+          ninja
