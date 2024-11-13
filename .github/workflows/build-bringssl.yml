@@ -1,16 +1,13 @@
-name: Build BoringSSL with Naive Support
-
+name: Build-bring
 on:
   push:
     branches: [naive]
     paths-ignore: [README.md]
   release:
     types: [created]
-
 defaults:
   run:
     shell: bash
-
 jobs:
   build_caddy_with_naive:
     runs-on: ubuntu-22.04
@@ -19,13 +16,9 @@ jobs:
       BORINGSSL_BRANCH: master
       BORINGSSL_DIR: ${{ github.workspace }}/boringssl
       LIBOQS_DIR: ${{ github.workspace }}/liboqs
-      RELEASE_TAG: latest
-
     steps:
-      # 检出代码库
       - uses: actions/checkout@v4
-
-      # 设置Go环境
+      
       - uses: actions/setup-go@v5
         with:
           go-version: ^1.21.9
@@ -40,40 +33,55 @@ jobs:
       - name: Install liboqs
         run: |
           rm -rf liboqs
-          git clone --branch main --single-branch --depth 1 https://github.com/open-quantum-safe/liboqs.git $LIBOQS_DIR
-          cd $LIBOQS_DIR
+          git clone --branch main --single-branch --depth 1 https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs
           mkdir build && cd build
-          cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=/usr/local ..
+          cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_USE_OPENSSL=OFF ..
           ninja
           sudo ninja install
+          cd ../..
 
-      # 构建 BoringSSL
-      - name: Build BoringSSL with Naive Support
+      # 克隆和编译支持 PQC 的 BoringSSL
+      - name: Build BoringSSL
         run: |
           rm -rf boringssl
-          git clone https://github.com/open-quantum-safe/boringssl.git $BORINGSSL_DIR
-          cd $BORINGSSL_DIR
+          git clone https://github.com/open-quantum-safe/boringssl.git
+          cd boringssl
           git checkout $BORINGSSL_BRANCH
           mkdir build && cd build
-          cmake -GNinja \
-            -DCMAKE_PREFIX_PATH=/usr/local \
-            -DCMAKE_LIBRARY_PATH=/usr/local/lib \
-            -DCMAKE_INCLUDE_PATH=/usr/local/include ..
+          cmake -GNinja -DCMAKE_PREFIX_PATH=/usr/local ..
           ninja
 
-      # 创建打包文件
-      - name: Package files
+      # 使用自定义 BoringSSL 编译 Caddy
+      - name: Build Caddy
         run: |
-          tar -cvf ${{ env.BUNDLE }}.tar.xz -C $BORINGSSL_DIR/build .
+          go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+          CGO_ENABLED=1 \
+          BORINGSSL_PATH=${{ env.BORINGSSL_DIR }} \
+          ~/go/bin/xcaddy build \
+            --with github.com/caddyserver/forwardproxy@master=$PWD
 
-      # 发布打包文件到GitHub Release
-      - name: Upload Release
-        uses: actions/upload-release-asset@v1
+      - name: Pack naiveproxy assets
+        run: |
+          mkdir ${{ env.BUNDLE }}
+          cp caddy LICENSE README.md ${{ env.BUNDLE }}
+          tar cJf ${{ env.BUNDLE }}.tar.xz ${{ env.BUNDLE }}
+          openssl sha256 ./caddy >sha256sum.txt
+          echo "SHA256SUM=$(cut -d' ' -f2 sha256sum.txt)" >>$GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          release_id: ${{ github.event.release.id || github.run_id }}
-          asset_path: ${{ env.BUNDLE }}.tar.xz
-          asset_name: ${{ env.BUNDLE }}.tar.xz
-          asset_content_type: application/x-xz
+          name: ${{ env.BUNDLE }}.tar.xz caddy executable sha256 ${{ env.SHA256SUM }}
+          path: sha256sum.txt
+
+      - name: Generate release tag
+        if: github.event_name == 'push'
+        run: echo "RELEASE_TAG=build-$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.BUNDLE }}.tar.xz
+          tag_name: ${{ github.event_name == 'release' && github.ref_name || env.RELEASE_TAG }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
