@@ -1,4 +1,4 @@
-name: Build
+name: Build-brinssl
 on:
   push:
     branches: [naive]
