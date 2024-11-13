@@ -39,6 +39,9 @@ jobs:
           cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_USE_OPENSSL=OFF ..
           ninja
           sudo ninja install
+          # 验证安装
+          ls -l /usr/local/include/oqs
+          ls -l /usr/local/lib/liboqs*
           cd ../..
 
       # 克隆和编译支持 PQC 的 BoringSSL
@@ -50,8 +53,11 @@ jobs:
           git checkout $BORINGSSL_BRANCH
           mkdir build && cd build
           cmake -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH=/usr/local \
             -DOQS_ROOT=/usr/local \
+            -DOQS_INCLUDE_DIR=/usr/local/include \
+            -DOQS_LIB_DIR=/usr/local/lib \
             ..
           ninja
 
