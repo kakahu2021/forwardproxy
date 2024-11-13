@@ -1,4 +1,4 @@
-name: Build-bringssl
+name: Build-bring
 on:
   push:
     branches: [naive]
@@ -15,6 +15,7 @@ jobs:
       BUNDLE: caddy-forwardproxy-naive
       BORINGSSL_BRANCH: master
       BORINGSSL_DIR: ${{ github.workspace }}/boringssl
+      LIBOQS_DIR: ${{ github.workspace }}/liboqs
     steps:
       - uses: actions/checkout@v4
       
@@ -31,12 +32,13 @@ jobs:
       # 安装 liboqs
       - name: Install liboqs
         run: |
+          rm -rf liboqs
           git clone --branch main --single-branch --depth 1 https://github.com/open-quantum-safe/liboqs.git
           cd liboqs
           mkdir build && cd build
-          cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=${{ env.BORINGSSL_DIR }}/oqs -DOQS_USE_OPENSSL=OFF ..
+          cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_USE_OPENSSL=OFF ..
           ninja
-          ninja install
+          sudo ninja install
           cd ../..
 
       # 克隆和编译支持 PQC 的 BoringSSL
@@ -46,9 +48,8 @@ jobs:
           git clone https://github.com/open-quantum-safe/boringssl.git
           cd boringssl
           git checkout $BORINGSSL_BRANCH
-          mkdir build
-          cd build
-          cmake -GNinja ..
+          mkdir build && cd build
+          cmake -GNinja -DCMAKE_PREFIX_PATH=/usr/local ..
           ninja
 
       # 使用自定义 BoringSSL 编译 Caddy
