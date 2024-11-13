@@ -27,7 +27,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake gcc ninja-build libunwind-dev pkg-config python3 golang-cfssl
+          sudo apt-get install -y cmake gcc ninja-build libunwind-dev pkg-config python3 golang-cfssl \
+            build-essential libssl-dev zlib1g-dev
 
       # 安装 liboqs
       - name: Install liboqs
@@ -36,17 +37,21 @@ jobs:
           git clone --branch main --single-branch --depth 1 https://github.com/open-quantum-safe/liboqs.git
           cd liboqs
           mkdir build && cd build
-          cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_USE_OPENSSL=OFF ..
+          cmake -G"Ninja" \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DOQS_USE_OPENSSL=OFF \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            ..
           ninja
           sudo ninja install
-          # 验证安装
-          ls -l /usr/local/include/oqs
-          ls -l /usr/local/lib/liboqs*
+          sudo ldconfig
           cd ../..
 
       # 克隆和编译支持 PQC 的 BoringSSL
       - name: Build BoringSSL
         run: |
+          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
           rm -rf boringssl
           git clone https://github.com/open-quantum-safe/boringssl.git
           cd boringssl
@@ -54,10 +59,7 @@ jobs:
           mkdir build && cd build
           cmake -GNinja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/usr/local \
-            -DOQS_ROOT=/usr/local \
-            -DOQS_INCLUDE_DIR=/usr/local/include \
-            -DOQS_LIB_DIR=/usr/local/lib \
+            -DOQS_DIR=/usr/local \
             ..
           ninja
 
