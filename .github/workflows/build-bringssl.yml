@@ -19,11 +19,12 @@ jobs:
       BORINGSSL_BRANCH: master
       BORINGSSL_DIR: ${{ github.workspace }}/boringssl
       LIBOQS_DIR: ${{ github.workspace }}/liboqs
+      RELEASE_TAG: latest
 
     steps:
       # 检出代码库
       - uses: actions/checkout@v4
-      
+
       # 设置Go环境
       - uses: actions/setup-go@v5
         with:
@@ -39,8 +40,8 @@ jobs:
       - name: Install liboqs
         run: |
           rm -rf liboqs
-          git clone --branch main --single-branch --depth 1 https://github.com/open-quantum-safe/liboqs.git
-          cd liboqs
+          git clone --branch main --single-branch --depth 1 https://github.com/open-quantum-safe/liboqs.git $LIBOQS_DIR
+          cd $LIBOQS_DIR
           mkdir build && cd build
           cmake -G"Ninja" -DCMAKE_INSTALL_PREFIX=/usr/local ..
           ninja
@@ -50,9 +51,29 @@ jobs:
       - name: Build BoringSSL with Naive Support
         run: |
           rm -rf boringssl
-          git clone https://github.com/open-quantum-safe/boringssl.git
-          cd boringssl
+          git clone https://github.com/open-quantum-safe/boringssl.git $BORINGSSL_DIR
+          cd $BORINGSSL_DIR
           git checkout $BORINGSSL_BRANCH
           mkdir build && cd build
-          cmake -GNinja -DCMAKE_PREFIX_PATH=/usr/local ..
+          cmake -GNinja \
+            -DCMAKE_PREFIX_PATH=/usr/local \
+            -DCMAKE_LIBRARY_PATH=/usr/local/lib \
+            -DCMAKE_INCLUDE_PATH=/usr/local/include ..
           ninja
+
+      # 创建打包文件
+      - name: Package files
+        run: |
+          tar -cvf ${{ env.BUNDLE }}.tar.xz -C $BORINGSSL_DIR/build .
+
+      # 发布打包文件到GitHub Release
+      - name: Upload Release
+        uses: actions/upload-release-asset@v1
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          release_id: ${{ github.event.release.id || github.run_id }}
+          asset_path: ${{ env.BUNDLE }}.tar.xz
+          asset_name: ${{ env.BUNDLE }}.tar.xz
+          asset_content_type: application/x-xz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
