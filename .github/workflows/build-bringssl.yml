@@ -49,7 +49,10 @@ jobs:
           cd boringssl
           git checkout $BORINGSSL_BRANCH
           mkdir build && cd build
-          cmake -GNinja -DCMAKE_PREFIX_PATH=/usr/local ..
+          cmake -GNinja \
+            -DCMAKE_PREFIX_PATH=/usr/local \
+            -DOQS_ROOT=/usr/local \
+            ..
           ninja
 
       # 使用自定义 BoringSSL 编译 Caddy
